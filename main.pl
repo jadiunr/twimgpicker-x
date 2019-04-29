@@ -41,13 +41,7 @@ while (1) {
   for my $i (reverse 0..30) {
     unless (grep {$_ eq $tweets->[$i]{id}} @$old_tweet_ids) {
       my $media_array = $tweets->[$i]{extended_entities}{media};
-      if ($media_array) {
-        for (@$media_array) {
-          $pm->start and next;
-          download($pm, $http, $settings, $_);
-          $pm->finish;
-        }
-      }
+      download($pm, $http, $settings, $media_array) if $media_array;
     }
   }
   my $latest_tweet_ids = [];
@@ -58,14 +52,41 @@ while (1) {
 }
 
 sub download {
-  my ($pm, $http, $settings, $media) = @_;
+  my ($pm, $http, $settings, $media_array) = @_;
+  my $binary;
 
-  my $image = $http->get($media->{media_url}.':large');
-  die 'Cannot fetch image: '.$media->{media_url}
-    if grep {$_ eq $image->code} (404, 500);
-  open my $fh, ">", $settings->{outdir}.'/'.basename($media->{media_url})
-    or die 'Cannot create file: '.basename($media->{media_url});
-  say $fh $image->content;
-  close $fh;
-  say 'Saved image: '.$media->{media_url};
+  if($media_array->[0]{video_info}) {
+    $pm->start and return;
+
+    my $video = $media_array->[0]{video_info}{variants};
+    for (@$video) { $_->{bitrate} = 0 unless $_->{bitrate} }
+    my $url = (sort { $b->{bitrate} <=> $a->{bitrate} } @$video)[0]{url};
+    $url =~ s/\?.+//;
+    $binary = $http->get($url);
+    die 'Cannot fetch video: '.$url
+      if grep {$_ eq $binary->code} (404, 500);
+    open my $fh, ">", $settings->{outdir}.'/'.basename($url)
+      or die 'Cannot create file: '.basename($url);
+    say $fh $binary->content;
+    close $fh;
+    say 'Saved video: '.$url;
+
+    $pm->finish;
+  } else {
+    for my $image (@$media_array) {
+      $pm->start and next;
+
+      my $url = $image->{media_url};
+      $binary = $http->get($url.':large');
+      die 'Cannot fetch image: '.$url
+        if grep {$_ eq $binary->code} (404, 500);
+      open my $fh, ">", $settings->{outdir}.'/'.basename($url)
+        or die 'Cannot create file: '.basename($url);
+      say $fh $binary->content;
+      close $fh;
+      say 'Saved image: '.$url;
+
+      $pm->finish;
+    }
+  }
 }
