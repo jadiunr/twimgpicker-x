@@ -5,10 +5,5 @@ services:
     build: .
     volumes:
       - .:/app
-      - cpanm:/root/.cpanm
     stdin_open: true
     tty: true
-
-volumes:
-  cpanm:
-    driver: local
