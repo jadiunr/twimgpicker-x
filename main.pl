@@ -3,6 +3,7 @@ use warnings;
 use utf8;
 use feature 'say';
 
+use Time::Piece;
 use File::Basename 'basename';
 use Net::Twitter::Lite::WithAPIv1_1;
 use YAML::Tiny;
@@ -35,7 +36,8 @@ say 'Crawling begin.';
 while (1) {
   $tweets = eval { $nt->user_timeline({screen_name => $settings->{target}, count => 60}) };
   if ($@) {
-    warn "WARNING: $@";
+    warn "[@{[ localtime->datetime ]}]Warning           : $@";
+    sleep(15);
     next;
   };
   for my $i (reverse 0..30) {
@@ -63,13 +65,13 @@ sub download {
     my $url = (sort { $b->{bitrate} <=> $a->{bitrate} } @$video)[0]{url};
     $url =~ s/\?.+//;
     $binary = $http->get($url);
-    die 'Cannot fetch video: '.$url
+    die "[@{[ localtime->datetime ]}]Cannot fetch video: $url"
       if grep {$_ eq $binary->code} (404, 500);
     open my $fh, ">", $settings->{outdir}.'/'.basename($url)
-      or die 'Cannot create file: '.basename($url);
+      or die "[@{[ localtime->datetime ]}]Cannot create file: ".basename($url);
     say $fh $binary->content;
     close $fh;
-    say 'Saved video: '.$url;
+    say "[@{[ localtime->datetime ]}]Saved video       : $url";
 
     $pm->finish;
   } else {
@@ -78,13 +80,13 @@ sub download {
 
       my $url = $image->{media_url};
       $binary = $http->get($url.':large');
-      die 'Cannot fetch image: '.$url
+      die "[@{[ localtime->datetime ]}]Cannot fetch image: $url"
         if grep {$_ eq $binary->code} (404, 500);
       open my $fh, ">", $settings->{outdir}.'/'.basename($url)
-        or die 'Cannot create file: '.basename($url);
+        or die "[@{[ localtime->datetime ]}]Cannot create file: ".basename($url);
       say $fh $binary->content;
       close $fh;
-      say 'Saved image: '.$url;
+      say "[@{[ localtime->datetime ]}]Saved image       : $url";
 
       $pm->finish;
     }
