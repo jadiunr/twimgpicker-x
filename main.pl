@@ -25,6 +25,10 @@ my $nt = Net::Twitter::Lite::WithAPIv1_1->new(
   access_token_secret => $settings->{access_token_secret}
 );
 
+# cd
+if (!-d $settings->{outdir}) { mkdir $settings->{outdir} or die; }
+chdir $settings->{outdir} or die;
+
 say 'Initialize now.';
 # Initialize
 my $old_tweet_ids = [];
@@ -67,11 +71,7 @@ sub download {
     $binary = $http->get($url);
     die "[@{[ localtime->datetime ]}]Cannot fetch video: $url"
       if grep {$_ eq $binary->code} (404, 500);
-    open my $fh, ">", $settings->{outdir}.'/'.basename($url)
-      or die "[@{[ localtime->datetime ]}]Cannot create file: ".basename($url);
-    say $fh $binary->content;
-    close $fh;
-    say "[@{[ localtime->datetime ]}]Saved video       : $url";
+    save($url, $binary);
 
     $pm->finish;
   } else {
@@ -82,13 +82,23 @@ sub download {
       $binary = $http->get($url.':large');
       die "[@{[ localtime->datetime ]}]Cannot fetch image: $url"
         if grep {$_ eq $binary->code} (404, 500);
-      open my $fh, ">", $settings->{outdir}.'/'.basename($url)
-        or die "[@{[ localtime->datetime ]}]Cannot create file: ".basename($url);
-      say $fh $binary->content;
-      close $fh;
-      say "[@{[ localtime->datetime ]}]Saved image       : $url";
+      save($url, $binary);
 
       $pm->finish;
     }
   }
+}
+
+sub save {
+  my ($url, $binary) = @_;
+  my $filename = basename($url);
+  my $date = localtime->yy.localtime->mon;
+
+  if (!-d $date) { mkdir $date or die; }
+
+  open my $fh, ">", $date.'/'.$filename
+    or die "[@{[ localtime->datetime ]}]Cannot create file: ".$url;
+  say $fh $binary->content;
+  close $fh;
+  say "[@{[ localtime->datetime ]}]Saved image       : $url";
 }
