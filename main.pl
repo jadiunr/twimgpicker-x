@@ -92,7 +92,7 @@ sub download {
 sub save {
   my ($url, $binary) = @_;
   my $filename = basename($url);
-  my $date = localtime->yy.localtime->mon;
+  my $date = localtime->strftime('%y%m');
 
   if (!-d $date) { mkdir $date or die; }
 
