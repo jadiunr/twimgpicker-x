@@ -3,7 +3,7 @@ FROM perl:5.28.2-threaded
 ENV LANG C.UTF-8
 ENV TZ Asia/Tokyo
 
-RUN cpanm Carton
+RUN cpanm -nq Carton
 
 ARG uid=1000
 ARG gid=1000
