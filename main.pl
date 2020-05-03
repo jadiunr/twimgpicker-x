@@ -10,6 +10,8 @@ use YAML::Tiny;
 use Furl;
 use Parallel::ForkManager;
 
+use Pry;
+
 my $settings = YAML::Tiny->read('./settings.yml')->[0];
 my $pm = Parallel::ForkManager->new(8);
 my $http = Furl->new();
@@ -31,34 +33,30 @@ chdir $settings->{outdir} or die;
 
 say 'Initialize now.';
 # Initialize
-my $old_tweet_ids = [];
 my $tweets = $nt->user_timeline({screen_name => $settings->{target}, count => 60});
-push(@$old_tweet_ids, $_->{id}) for @$tweets;
+my $since_id = $tweets->[0]{id};
 
 say 'Crawling begin.';
 # Crawling routine
 while (1) {
-  $tweets = eval { $nt->user_timeline({screen_name => $settings->{target}, count => 60}) };
+  $tweets = eval { $nt->user_timeline({screen_name => $settings->{target}, count => 60, since_id => $since_id}) };
   if ($@) {
     warn "[@{[ localtime->datetime ]}]Warning           : $@";
     sleep(15);
     next;
-  };
-  for my $i (reverse 0..30) {
-    unless (grep {$_ eq $tweets->[$i]{id}} @$old_tweet_ids) {
-      my $media_array = $tweets->[$i]{extended_entities}{media};
-      download($pm, $http, $settings, $media_array) if $media_array;
-    }
   }
-  my $latest_tweet_ids = [];
-  push(@$latest_tweet_ids, $_->{id}) for @$tweets;
-  $old_tweet_ids = $latest_tweet_ids;
-
-  sleep(15);
+  if (@$tweets) {
+    for my $tweet (@$tweets) {
+      my $media_array = $tweet->{extended_entities}{media};
+      download($media_array) if $media_array;
+    }
+    $since_id = $tweets->[0]{id};
+  }
+  sleep 15;
 }
 
 sub download {
-  my ($pm, $http, $settings, $media_array) = @_;
+  my $media_array = shift;
   my $binary;
 
   if($media_array->[0]{video_info}) {
