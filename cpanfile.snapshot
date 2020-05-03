@@ -885,6 +885,16 @@ DISTRIBUTIONS
       perl 5.006
       strict 0
       warnings 0
+  Term-ReadLine-Gnu-1.36
+    pathname: H/HA/HAYASHI/Term-ReadLine-Gnu-1.36.tar.gz
+    provides:
+      Term::ReadLine::Gnu 1.36
+      Term::ReadLine::Gnu::AU 1.36
+      Term::ReadLine::Gnu::Var 1.36
+      Term::ReadLine::Gnu::XS 1.36
+    requirements:
+      ExtUtils::MakeMaker 0
+      perl 5.008001
   Test-Warn-0.36
     pathname: B/BI/BIGJ/Test-Warn-0.36.tar.gz
     provides:
