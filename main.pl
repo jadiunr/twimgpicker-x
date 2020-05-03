@@ -46,7 +46,7 @@ while (1) {
     next;
   }
   if (@$tweets) {
-    for my $tweet (@$tweets) {
+    for my $tweet (reverse @$tweets) {
       my $media_array = $tweet->{extended_entities}{media};
       download($media_array) if $media_array;
     }
