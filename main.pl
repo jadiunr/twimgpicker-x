@@ -5,6 +5,7 @@ use feature 'say';
 
 use Time::Piece;
 use File::Basename 'basename';
+use File::Path 'mkpath';
 use Net::Twitter::Lite::WithAPIv1_1;
 use YAML::Tiny;
 use Furl;
@@ -82,9 +83,9 @@ sub save {
   my $filename = basename($url);
   my $year = localtime->strftime('%Y');
   my $month = localtime->strftime('%m');
-  my $destpath = "./${year}/${month}"
+  my $destpath = "./${year}/${month}";
 
-  if (!-d $destpath) { mkdir $destpath or die; }
+  if (!-d $destpath) { mkpath $destpath or die; }
 
   open my $fh, ">", $destpath.'/'.$filename
     or die "[@{[ localtime->datetime ]}]Cannot create file: ".$url;
