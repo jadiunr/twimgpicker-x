@@ -8,12 +8,10 @@ use File::Basename 'basename';
 use Net::Twitter::Lite::WithAPIv1_1;
 use YAML::Tiny;
 use Furl;
-use Parallel::ForkManager;
 
 use Pry;
 
 my $settings = YAML::Tiny->read('./settings.yml')->[0];
-my $pm = Parallel::ForkManager->new(8);
 my $http = Furl->new();
 
 # Autoflush
@@ -60,8 +58,6 @@ sub download {
   my $binary;
 
   if($media_array->[0]{video_info}) {
-    $pm->start and return;
-
     my $video = $media_array->[0]{video_info}{variants};
     for (@$video) { $_->{bitrate} = 0 unless $_->{bitrate} }
     my $url = (sort { $b->{bitrate} <=> $a->{bitrate} } @$video)[0]{url};
@@ -70,19 +66,13 @@ sub download {
     die "[@{[ localtime->datetime ]}]Cannot fetch video: $url"
       if grep {$_ eq $binary->code} (404, 500);
     save($url, $binary);
-
-    $pm->finish;
   } else {
     for my $image (@$media_array) {
-      $pm->start and next;
-
       my $url = $image->{media_url};
       $binary = $http->get($url.':large');
       die "[@{[ localtime->datetime ]}]Cannot fetch image: $url"
         if grep {$_ eq $binary->code} (404, 500);
       save($url, $binary);
-
-      $pm->finish;
     }
   }
 }
