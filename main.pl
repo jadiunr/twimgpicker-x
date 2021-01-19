@@ -37,10 +37,10 @@ my $since_id = $tweets->[0]{id};
 say 'Crawling begin.';
 # Crawling routine
 while (1) {
-  $tweets = eval { $nt->user_timeline({screen_name => $settings->{target}, count => 60, since_id => $since_id}) };
+  $tweets = eval { $nt->user_timeline({screen_name => $settings->{target}, count => 120, since_id => $since_id}) };
   if ($@) {
     warn "[@{[ localtime->datetime ]}]Warning           : $@";
-    sleep(15);
+    sleep(30);
     next;
   }
   if (@$tweets) {
@@ -80,11 +80,13 @@ sub download {
 sub save {
   my ($url, $binary) = @_;
   my $filename = basename($url);
-  my $date = localtime->strftime('%y%m');
+  my $year = localtime->strftime('%Y');
+  my $month = localtime->strftime('%m');
+  my $destpath = "./${year}/${month}"
 
-  if (!-d $date) { mkdir $date or die; }
+  if (!-d $destpath) { mkdir $destpath or die; }
 
-  open my $fh, ">", $date.'/'.$filename
+  open my $fh, ">", $destpath.'/'.$filename
     or die "[@{[ localtime->datetime ]}]Cannot create file: ".$url;
   say $fh $binary->content;
   close $fh;
