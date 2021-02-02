@@ -10,8 +10,6 @@ use Net::Twitter::Lite::WithAPIv1_1;
 use YAML::Tiny;
 use Furl;
 
-use Pry;
-
 my $settings = YAML::Tiny->read('./settings.yml')->[0];
 my $http = Furl->new();
 
@@ -30,28 +28,14 @@ my $nt = Net::Twitter::Lite::WithAPIv1_1->new(
 if (!-d $settings->{outdir}) { mkdir $settings->{outdir} or die; }
 chdir $settings->{outdir} or die;
 
-say 'Initialize now.';
-# Initialize
-my $tweets = $nt->user_timeline({screen_name => $settings->{target}, count => 60});
-my $since_id = $tweets->[0]{id};
+my $mediators = $settings->{mediators};
 
-say 'Crawling begin.';
-# Crawling routine
-while (1) {
-  $tweets = eval { $nt->user_timeline({screen_name => $settings->{target}, count => 120, since_id => $since_id}) };
-  if ($@) {
-    warn "[@{[ localtime->datetime ]}]Warning           : $@";
-    sleep(30);
-    next;
+for my $mediator (@$mediators) {
+  my $tweets = $nt->favorites({screen_name => $mediator, count => 200});
+  for my $tweet (reverse @$tweets) {
+    my $media_array = $tweet->{extended_entities}{media};
+    download($media_array) if $media_array;
   }
-  if (@$tweets) {
-    for my $tweet (reverse @$tweets) {
-      my $media_array = $tweet->{extended_entities}{media};
-      download($media_array) if $media_array;
-    }
-    $since_id = $tweets->[0]{id};
-  }
-  sleep 15;
 }
 
 sub download {
@@ -63,33 +47,41 @@ sub download {
     for (@$video) { $_->{bitrate} = 0 unless $_->{bitrate} }
     my $url = (sort { $b->{bitrate} <=> $a->{bitrate} } @$video)[0]{url};
     $url =~ s/\?.+//;
+
+    my $filename = basename($url);
+    if (-f $filename or -f "viewed/$filename") {
+      say "[@{[ localtime->datetime ]}]Already saved     : $filename";
+      return;
+    }
+
     $binary = $http->get($url);
     die "[@{[ localtime->datetime ]}]Cannot fetch video: $url"
       if grep {$_ eq $binary->code} (404, 500);
-    save($url, $binary);
+    save($filename, $binary);
   } else {
     for my $image (@$media_array) {
       my $url = $image->{media_url};
+
+      my $filename = basename($url);
+      if (-f $filename or -f "viewed/$filename") {
+        say "[@{[ localtime->datetime ]}]Already saved     : $filename";
+        return;
+      }
+
       $binary = $http->get($url.':large');
       die "[@{[ localtime->datetime ]}]Cannot fetch image: $url"
         if grep {$_ eq $binary->code} (404, 500);
-      save($url, $binary);
+      save($filename, $binary);
     }
   }
 }
 
 sub save {
-  my ($url, $binary) = @_;
-  my $filename = basename($url);
-  my $year = localtime->strftime('%Y');
-  my $month = localtime->strftime('%m');
-  my $destpath = "./${year}/${month}";
+  my ($filename, $binary) = @_;
 
-  if (!-d $destpath) { mkpath $destpath or die; }
-
-  open my $fh, ">", $destpath.'/'.$filename
-    or die "[@{[ localtime->datetime ]}]Cannot create file: ".$url;
+  open my $fh, ">", $filename
+    or die "[@{[ localtime->datetime ]}]Cannot create file: ".$filename;
   say $fh $binary->content;
   close $fh;
-  say "[@{[ localtime->datetime ]}]Saved image       : $url";
+  say "[@{[ localtime->datetime ]}]Image saved       : $filename";
 }

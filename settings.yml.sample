@@ -5,3 +5,8 @@ access_token_secret:
 
 target: 
 outdir: media
+
+mediators:
+- foo
+- bar
+- baz
