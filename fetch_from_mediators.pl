@@ -29,13 +29,23 @@ if (!-d $settings->{outdir}) { mkdir $settings->{outdir} or die; }
 chdir $settings->{outdir} or die;
 
 my $mediators = $settings->{mediators};
+my $all_favorites = [];
 
 for my $mediator (@$mediators) {
-  my $tweets = $nt->favorites({screen_name => $mediator, count => 200});
-  for my $tweet (reverse @$tweets) {
-    my $media_array = $tweet->{extended_entities}{media};
-    download($media_array) if $media_array;
-  }
+  my $favorites = $nt->favorites({screen_name => $mediator, count => 200});
+  push(@$all_favorites, @$favorites);
+}
+
+my $sorted_favorites = 
+  [sort {
+    Time::Piece->strptime($a->{created_at}, '%a %b %d %T %z %Y')
+    <=>
+    Time::Piece->strptime($b->{created_at}, '%a %b %d %T %z %Y')
+  } @$all_favorites];
+
+for my $favorite (@$sorted_favorites) {
+  my $media_array = $favorite->{extended_entities}{media};
+  download($media_array) if $media_array;
 }
 
 sub download {
@@ -49,7 +59,7 @@ sub download {
     $url =~ s/\?.+//;
 
     my $filename = basename($url);
-    if (-f $filename or -f "viewed/$filename") {
+    if (is_file_exists_recursive('.', $filename)) {
       say "[@{[ localtime->datetime ]}]Already saved     : $filename";
       return;
     }
@@ -63,7 +73,7 @@ sub download {
       my $url = $image->{media_url};
 
       my $filename = basename($url);
-      if (-f $filename or -f "viewed/$filename") {
+      if (is_file_exists_recursive('.', $filename)) {
         say "[@{[ localtime->datetime ]}]Already saved     : $filename";
         return;
       }
@@ -84,4 +94,19 @@ sub save {
   say $fh $binary->content;
   close $fh;
   say "[@{[ localtime->datetime ]}]Image saved       : $filename";
+}
+
+sub is_file_exists_recursive {
+  my ($dir, $targetfile) = @_;
+  my @files = glob("$dir/*");
+  my $ret = 0;
+
+  for my $file (@files) {
+    if (-d $file) {
+      $ret += is_file_exists_recursive($file, $targetfile);
+    } else {
+      return 1 if $file =~ $targetfile;
+    }
+  }
+  return $ret;
 }
