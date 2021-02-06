@@ -59,7 +59,7 @@ sub download {
     $url =~ s/\?.+//;
 
     my $filename = basename($url);
-    if (is_file_exists_recursive('.', $filename)) {
+    if (-f "all/$filename") {
       say "[@{[ localtime->datetime ]}]Already saved     : $filename";
       return;
     }
@@ -73,7 +73,7 @@ sub download {
       my $url = $image->{media_url};
 
       my $filename = basename($url);
-      if (is_file_exists_recursive('.', $filename)) {
+      if (-f "all/$filename") {
         say "[@{[ localtime->datetime ]}]Already saved     : $filename";
         return;
       }
@@ -94,19 +94,4 @@ sub save {
   say $fh $binary->content;
   close $fh;
   say "[@{[ localtime->datetime ]}]Image saved       : $filename";
-}
-
-sub is_file_exists_recursive {
-  my ($dir, $targetfile) = @_;
-  my @files = glob("$dir/*");
-  my $ret = 0;
-
-  for my $file (@files) {
-    if (-d $file) {
-      $ret += is_file_exists_recursive($file, $targetfile);
-    } else {
-      return 1 if $file =~ $targetfile;
-    }
-  }
-  return $ret;
 }
