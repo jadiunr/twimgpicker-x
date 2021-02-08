@@ -1,5 +1,4 @@
 /local
 /media
 settings.yml
-
 docker-compose.override.yml
