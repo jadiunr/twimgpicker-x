@@ -32,8 +32,12 @@ my $mediators = $settings->{mediators};
 my $all_favorites = [];
 
 for my $mediator (@$mediators) {
-  my $favorites = $nt->favorites({screen_name => $mediator, count => 200});
-  push(@$all_favorites, @$favorites);
+  my $max_id = -1;
+  for my $iter (1..3) {
+    my $favorites = $nt->favorites({screen_name => $mediator, count => 200, max_id => $max_id});
+    push(@$all_favorites, @$favorites);
+    $max_id = $favorites->[-1];
+  }
 }
 
 my $sorted_favorites = 
