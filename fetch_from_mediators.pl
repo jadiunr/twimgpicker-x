@@ -32,20 +32,25 @@ my $mediators = $settings->{mediators};
 my $all_favorites = [];
 
 for my $mediator (@$mediators) {
-  my $max_id = -1;
+  my $max_id;
   for my $iter (1..3) {
-    my $favorites = $nt->favorites({screen_name => $mediator, count => 200, max_id => $max_id});
+    my $favorites;
+    $favorites = $nt->favorites({screen_name => $mediator, count => 200}) if !defined($max_id);
+    $favorites = $nt->favorites({screen_name => $mediator, count => 200, max_id => $max_id}) if defined($max_id);
     push(@$all_favorites, @$favorites);
-    $max_id = $favorites->[-1];
+    $max_id = $favorites->[-1]{id};
   }
 }
+
+my %tmp;
+my $unique_favorites = [grep {!$tmp{$_->{id}}++} @$all_favorites];
 
 my $sorted_favorites = 
   [sort {
     Time::Piece->strptime($a->{created_at}, '%a %b %d %T %z %Y')
     <=>
     Time::Piece->strptime($b->{created_at}, '%a %b %d %T %z %Y')
-  } @$all_favorites];
+  } @$unique_favorites];
 
 for my $favorite (@$sorted_favorites) {
   my $media_array = $favorite->{extended_entities}{media};
