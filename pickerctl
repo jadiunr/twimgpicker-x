@@ -1,3 +1,5 @@
+#!/usr/bin/env perl
+
 use strict;
 use warnings;
 use utf8;
@@ -27,33 +29,44 @@ my $nt = Net::Twitter::Lite::WithAPIv1_1->new(
 # cd
 if (!-d $settings->{outdir}) { mkdir $settings->{outdir} or die; }
 chdir $settings->{outdir} or die;
+my $saved_files = [map {basename($_)} (split /\n/, `find .`)];
 
 my $mediators = $settings->{mediators};
-my $all_favorites = [];
+my $all_statuses = [];
+
+{
+  my $max_id;
+  for my $iter (1..4) {
+    my $timeline;
+    $timeline = $nt->home_timeline({count => 200}) if !defined($max_id);
+    $timeline = $nt->home_timeline({count => 200, max_id => $max_id}) if defined($max_id);
+    push(@$all_statuses, @$timeline);
+    $max_id = $timeline->[-1]{id};
+  }
+}
 
 for my $mediator (@$mediators) {
   my $max_id;
-  for my $iter (1..3) {
+  for my $iter (1..4) {
     my $favorites;
     $favorites = $nt->favorites({screen_name => $mediator, count => 200}) if !defined($max_id);
     $favorites = $nt->favorites({screen_name => $mediator, count => 200, max_id => $max_id}) if defined($max_id);
-    push(@$all_favorites, @$favorites);
+    push(@$all_statuses, @$favorites);
     $max_id = $favorites->[-1]{id};
   }
 }
 
 my %tmp;
-my $unique_favorites = [grep {!$tmp{$_->{id}}++} @$all_favorites];
-
-my $sorted_favorites = 
+my $unique_statuses = [grep {!$tmp{$_->{id}}++} @$all_statuses];
+my $sorted_statuses = 
   [sort {
     Time::Piece->strptime($a->{created_at}, '%a %b %d %T %z %Y')
     <=>
     Time::Piece->strptime($b->{created_at}, '%a %b %d %T %z %Y')
-  } @$unique_favorites];
+  } @$unique_statuses];
 
-for my $favorite (@$sorted_favorites) {
-  my $media_array = $favorite->{extended_entities}{media};
+for my $status (@$sorted_statuses) {
+  my $media_array = $status->{extended_entities}{media};
   download($media_array) if $media_array;
 }
 
@@ -68,13 +81,13 @@ sub download {
     $url =~ s/\?.+//;
 
     my $filename = basename($url);
-    if (-f "all/$filename") {
+    if (grep {$filename eq $_} @$saved_files or -f "./$filename") {
       say "[@{[ localtime->datetime ]}]Already saved     : $filename";
       return;
     }
 
     $binary = $http->get($url);
-    die "[@{[ localtime->datetime ]}]Cannot fetch video: $url"
+    die "[@{[ localtime->datetime ]}]Cannot fetch video: returned " . $binary->code . ", url: $url"
       if grep {$_ eq $binary->code} (404, 500);
     save($filename, $binary);
   } else {
@@ -82,13 +95,13 @@ sub download {
       my $url = $image->{media_url};
 
       my $filename = basename($url);
-      if (-f "all/$filename") {
+      if (grep {$filename eq $_} @$saved_files or -f "./$filename") {
         say "[@{[ localtime->datetime ]}]Already saved     : $filename";
         return;
       }
 
-      $binary = $http->get($url.':large');
-      die "[@{[ localtime->datetime ]}]Cannot fetch image: $url"
+      $binary = $http->get($url.'?name=orig');
+      die "[@{[ localtime->datetime ]}]Cannot fetch image: returned " . $binary->code . ", url: $url"
         if grep {$_ eq $binary->code} (404, 500);
       save($filename, $binary);
     }
@@ -99,7 +112,7 @@ sub save {
   my ($filename, $binary) = @_;
 
   open my $fh, ">", $filename
-    or die "[@{[ localtime->datetime ]}]Cannot create file: ".$filename;
+    or die "[@{[ localtime->datetime ]}]Cannot create file: $!, filename: ".$filename;
   say $fh $binary->content;
   close $fh;
   say "[@{[ localtime->datetime ]}]Image saved       : $filename";

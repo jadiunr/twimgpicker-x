@@ -5,3 +5,4 @@ requires 'Pry';
 requires 'Net::OAuth';
 requires 'Furl';
 requires 'Parallel::ForkManager';
+requires 'File::Find::Rule';
