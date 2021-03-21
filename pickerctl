@@ -8,9 +8,10 @@ use feature 'say';
 use Time::Piece;
 use File::Basename 'basename';
 use File::Path 'mkpath';
-use Net::Twitter::Lite::WithAPIv1_1;
+use Twitter::API;
 use YAML::Tiny;
 use Furl;
+use Data::Dumper;
 
 my $settings = YAML::Tiny->read('./settings.yml')->[0];
 my $http = Furl->new();
@@ -19,7 +20,8 @@ my $http = Furl->new();
 $|=1;
 
 # Authentication
-my $nt = Net::Twitter::Lite::WithAPIv1_1->new(
+my $nt = Twitter::API->new_with_traits(
+  traits              => ['Enchilada', 'RateLimiting'],
   consumer_key        => $settings->{consumer_key},
   consumer_secret     => $settings->{consumer_secret},
   access_token        => $settings->{access_token},
@@ -28,11 +30,10 @@ my $nt = Net::Twitter::Lite::WithAPIv1_1->new(
 
 # cd
 if (!-d $settings->{outdir}) { mkdir $settings->{outdir} or die; }
-chdir $settings->{outdir} or die;
-my $saved_files = [map {basename($_)} (split /\n/, `find .`)];
-
+my $saved_files = get_saved_file_list($settings->{outdir});
 my $mediators = $settings->{mediators};
 my $all_statuses = [];
+my $new_saved_files = [];
 
 {
   my $max_id;
@@ -66,13 +67,20 @@ my $sorted_statuses =
   } @$unique_statuses];
 
 for my $status (@$sorted_statuses) {
-  my $media_array = $status->{extended_entities}{media}
-  download($media_array) if $media_array;
+  my $media_array = $status->{extended_entities}{media};
+  download($media_array, $status->{id}) if $media_array;
 }
+
+update_saved_file_list($new_saved_files);
+
+my $rate_limit_status = $nt->rate_limit_status()->{resources};
+say Dumper $rate_limit_status->{favorites};
+say Dumper $rate_limit_status->{statuses}{'/statuses/home_timeline'};
+say Dumper $rate_limit_status->{statuses}{'/statuses/user_timeline'};
 
 sub download {
   my $media_array = shift;
-  my $status_id = $media_array->[0]{source_status_id};
+  my $status_id = $media_array->[0]{source_status_id} ? $media_array->[0]{source_status_id} : shift;
   my $binary;
 
   if($media_array->[0]{video_info}) {
@@ -82,29 +90,31 @@ sub download {
     $url =~ s/\?.+//;
 
     my $filename = $status_id."-".basename($url);
-    if (grep {$filename eq $_} @$saved_files or -f "./$filename") {
+    if (grep {$filename eq $_} @$saved_files or -f "./$settings->{outdir}/$filename") {
       say "[@{[ localtime->datetime ]}]Already saved     : $filename";
       return;
     }
 
     $binary = $http->get($url);
-    die "[@{[ localtime->datetime ]}]Cannot fetch video: returned " . $binary->code . ", url: $url"
+    warn "[@{[ localtime->datetime ]}]Cannot fetch video: returned " . $binary->code . ", url: $url" and return
       if grep {$_ eq $binary->code} (404, 500);
     save($filename, $binary);
+    push(@$new_saved_files, $filename);
   } else {
     for my $image (@$media_array) {
       my $url = $image->{media_url};
 
       my $filename = $status_id."-".basename($url);
-      if (grep {$filename eq $_} @$saved_files or -f "./$filename") {
+      if (grep {$filename eq $_} @$saved_files or -f "./$settings->{outdir}/$filename") {
         say "[@{[ localtime->datetime ]}]Already saved     : $filename";
         return;
       }
 
       $binary = $http->get($url.'?name=orig');
-      die "[@{[ localtime->datetime ]}]Cannot fetch image: returned " . $binary->code . ", url: $url"
+      warn "[@{[ localtime->datetime ]}]Cannot fetch image: returned " . $binary->code . ", url: $url" and next
         if grep {$_ eq $binary->code} (404, 500);
       save($filename, $binary);
+      push(@$new_saved_files, $filename);
     }
   }
 }
@@ -112,9 +122,32 @@ sub download {
 sub save {
   my ($filename, $binary) = @_;
 
-  open my $fh, ">", $filename
+  open my $fh, ">", "./$settings->{outdir}/$filename"
     or die "[@{[ localtime->datetime ]}]Cannot create file: $!, filename: ".$filename;
   say $fh $binary->content;
   close $fh;
   say "[@{[ localtime->datetime ]}]Image saved       : $filename";
+}
+
+sub get_saved_file_list {
+  my $fh;
+  my $saved_files;
+  if (-f './saved_files.txt') {
+    open $fh, '<', './saved_files.txt';
+    $saved_files = do { local $/; <$fh> };
+  } else {
+    open $fh, '>', './saved_files.txt';
+    $saved_files = `find ./$settings->{outdir} -type f -printf "\%f\n"`;
+    print $fh $saved_files;
+  }
+  close $fh;
+  return [map {$_} (split /\n/, $saved_files)];
+}
+
+sub update_saved_file_list {
+  my $new_saved_files = shift;
+  open my $fh, '>>', './saved_files.txt';
+  print $fh join("\n", @$new_saved_files);
+  print $fh "\n";
+  close $fh;
 }
