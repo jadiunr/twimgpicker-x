@@ -66,13 +66,13 @@ my $sorted_statuses =
   } @$unique_statuses];
 
 for my $status (@$sorted_statuses) {
-  download($status) if $status->{extended_entities}{media};
+  my $media_array = $status->{extended_entities}{media}
+  download($media_array) if $media_array;
 }
 
 sub download {
-  my $status = shift;
-  my $status_id = $status->{id};
-  my $media_array = $status->{extended_entities}{media};
+  my $media_array = shift;
+  my $status_id = $media_array->[0]{source_status_id};
   my $binary;
 
   if($media_array->[0]{video_info}) {
