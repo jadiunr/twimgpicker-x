@@ -66,12 +66,13 @@ my $sorted_statuses =
   } @$unique_statuses];
 
 for my $status (@$sorted_statuses) {
-  my $media_array = $status->{extended_entities}{media};
-  download($media_array) if $media_array;
+  download($status) if $status->{extended_entities}{media};
 }
 
 sub download {
-  my $media_array = shift;
+  my $status = shift;
+  my $status_id = $status->{id};
+  my $media_array = $status->{extended_entities}{media};
   my $binary;
 
   if($media_array->[0]{video_info}) {
@@ -80,7 +81,7 @@ sub download {
     my $url = (sort { $b->{bitrate} <=> $a->{bitrate} } @$video)[0]{url};
     $url =~ s/\?.+//;
 
-    my $filename = basename($url);
+    my $filename = $status_id."-".basename($url);
     if (grep {$filename eq $_} @$saved_files or -f "./$filename") {
       say "[@{[ localtime->datetime ]}]Already saved     : $filename";
       return;
@@ -94,7 +95,7 @@ sub download {
     for my $image (@$media_array) {
       my $url = $image->{media_url};
 
-      my $filename = basename($url);
+      my $filename = $status_id."-".basename($url);
       if (grep {$filename eq $_} @$saved_files or -f "./$filename") {
         say "[@{[ localtime->datetime ]}]Already saved     : $filename";
         return;
